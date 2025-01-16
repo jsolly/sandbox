@@ -1,5 +1,6 @@
 from pyproj import Transformer
 import pandas as pd
+from pyproj import CRS
 
 def get_sample_coordinates():
     """Return a list of sample North American city coordinates."""
@@ -14,30 +15,28 @@ def get_sample_coordinates():
 def create_transformers():
     """
     Create transformation objects for comparing EPSG:5070 (NAD83) and 
-    NLCD custom projection (WGS84) which share the same Albers Equal Area 
-    parameters but differ in datum.
+    its WGS84 variant, where only the datum differs.
     
     Returns:
         tuple: (transformer_nad83, transformer_wgs84) transformation objects
-    """
-    # Standard EPSG:5070 (NAD83 / Conus Albers)
-    # This can be done with EPSG code since it's a standard CRS
-    transformer_nad83 = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
     
-    # NLCD Custom projection (WGS84-based Albers Equal Area)
-    # Using from_proj since this is a custom CRS not in the EPSG database
+    Raises:
+        ValueError: If NAD83 datum is not found in the EPSG:5070 parameters
+    """
+    # Get the standard EPSG:5070 CRS
+    nad83_crs = CRS.from_epsg(5070)
+    
+    # Extract the projection parameters from EPSG:5070
+    params = nad83_crs.to_proj4()
+    print(f"EPSG:5070 params: {params}")
+    
+    wgs84_proj = params.replace("+datum=NAD83", "+datum=WGS84")
+    print(f"WGS84 proj: {wgs84_proj}")
+
+    transformer_nad83 = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
     transformer_wgs84 = Transformer.from_proj(
-        proj_from="EPSG:4326",  # Can use EPSG code for source
-        proj_to=("+proj=aea "
-                "+lat_0=23 "
-                "+lon_0=-96 "
-                "+lat_1=29.5 "
-                "+lat_2=45.5 "
-                "+x_0=0 "
-                "+y_0=0 "
-                "+datum=WGS84 "
-                "+units=m "
-                "+no_defs"),
+        proj_from="EPSG:4326",
+        proj_to=wgs84_proj,
         always_xy=True
     )
     
