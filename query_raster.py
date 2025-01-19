@@ -121,7 +121,7 @@ def get_pixel_counts_in_buffer_5070(x, y, buffer_meters=90):
 
 def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
     """
-    Get counts of pixel values within a square neighborhood window of a point in EPSG:5070 coordinates.
+    Get the neighborhood values around a point in EPSG:5070 coordinates.
     Uses ST_Neighborhood to efficiently get a window of pixels around the target cell.
     
     Args:
@@ -130,7 +130,7 @@ def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
         window_size (int): Size of the window in cells (default 3 for 3x3 window which is 90m x 90m assuming 30m cells)
     
     Returns:
-        dict: Dictionary of {pixel_value: count}
+        list: 2D array of pixel values in the neighborhood
     """
     try:
         with db_cursor() as cursor:
@@ -138,9 +138,7 @@ def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
             distance = window_size // 2
             
             query = f"""
-            WITH 
-            -- Get the raster coordinates for our point (returned as columnx, rowy)
-            raster_coords AS (
+            WITH raster_coords AS (
                 SELECT 
                     rast,
                     (ST_WorldToRasterCoord(rast, ST_SetSRID(ST_MakePoint({x}, {y}), 5070))).*
@@ -148,22 +146,16 @@ def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
                 WHERE ST_Intersects(rast, ST_SetSRID(ST_MakePoint({x}, {y}), 5070))
                 LIMIT 1
             )
-            -- Get neighborhood and count values directly
-            SELECT (pvc).*
-            FROM (
-                SELECT ST_ValueCount(
-                    ST_Neighborhood(rast, 1, columnx, rowy, {distance}, {distance})
-                ) AS pvc
-                FROM raster_coords
-            ) AS pixelcount;
+            SELECT ST_Neighborhood(rast, 1, columnx, rowy, {distance}, {distance}) as neighborhood
+            FROM raster_coords;
             """
             
             cursor.execute(query)
-            results = cursor.fetchall()
-            return {value: count for value, count in results}
+            result = cursor.fetchone()
+            return result[0] if result else None
             
     except Exception as e:
-        print(f"Error getting pixel counts: {e}")
+        print(f"Error getting neighborhood values: {e}")
         return None
 
 def main():
@@ -171,12 +163,12 @@ def main():
     x = -2275431.914745045  # Easting in EPSG:5070
     y = 1955935.417137774   # Northing in EPSG:5070
     
-    # Get the pixel value counts using both methods
+    # Get the values using both methods
     buffer_counts = get_pixel_counts_in_buffer_5070(x, y)
-    neighborhood_counts = get_pixel_counts_in_neighborhood_5070(x, y)
+    neighborhood = get_pixel_counts_in_neighborhood_5070(x, y)
     
     print("Buffer counts:", buffer_counts)
-    print("Neighborhood counts:", neighborhood_counts)
+    print("Neighborhood:", neighborhood)
 
 if __name__ == "__main__":
     main()
