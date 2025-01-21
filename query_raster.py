@@ -77,7 +77,7 @@ def get_pixel_value_5070(x, y):
         print(f"Error getting pixel value: {e}")
         return None
 
-def get_pixel_counts_in_buffer_5070(x, y, buffer_meters=90):
+def get_pixel_counts_in_buffer_5070(x, y, buffer_meters=115):
     """
     Get counts of pixel values within a buffer distance of a point in EPSG:5070 coordinates.
     
@@ -122,7 +122,7 @@ def get_pixel_counts_in_buffer_5070(x, y, buffer_meters=90):
         print(f"Error getting pixel counts: {e}")
         return None
 
-def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
+def get_pixel_counts_in_neighborhood_5070(x, y, window_size=7):
     """
     Get counts of pixel values within a square neighborhood window of a point in EPSG:5070 coordinates.
     Uses ST_Neighborhood to efficiently get a window of pixels around the target cell.
@@ -130,8 +130,15 @@ def get_pixel_counts_in_neighborhood_5070(x, y, window_size=3):
     Args:
         x (float): X coordinate in EPSG:5070
         y (float): Y coordinate in EPSG:5070
-        window_size (int): Size of the window in cells (default 3 for 3x3 window which is 90m x 90m assuming 30m cells)
-    
+        window_size (int): Size of the window in cells (default 7 for 7x7 window which is 210m x 210m assuming 30m cells)
+        since the NLCD raster is 30m resolution, this covers a ~115m radius circle with the center cell.
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
+            [ ] [ ] [ ] [*] [ ] [ ] [ ]
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
+            [ ] [ ] [ ] [ ] [ ] [ ] [ ]
     Returns:
         dict: Dictionary of {pixel_value: count}
     """
@@ -229,11 +236,12 @@ def plot_scaling_comparison(results, sizes):
     # Customize plot
     plt.title('Performance Comparison: Buffer vs Neighborhood Methods', 
               fontsize=14, pad=20)
-    plt.xlabel('Window Size (meters)', fontsize=12, labelpad=10)
+    plt.xlabel('Search Distance (km)', fontsize=12, labelpad=10)
     plt.ylabel('Median Execution Time (seconds)', fontsize=12, labelpad=10)
     
-    # Set x-axis ticks and labels
-    plt.xticks(x, [str(s) for s in sizes], rotation=45)
+    # Set x-axis ticks and labels in kilometers
+    sizes_km = [size/1000 for size in sizes]
+    plt.xticks(x, [f"{s:.1f}" for s in sizes_km], rotation=45)
     
     # Format y-axis
     min_time = min(min(buffer_medians), min(neighborhood_medians))
@@ -258,14 +266,17 @@ def main():
     # San Francisco coordinates in EPSG:5070 (Albers Equal Area)
     x = -2275431.914745045  # Easting in EPSG:5070
     y = 1955935.417137774   # Northing in EPSG:5070
+
+    # Example output
+    # print(get_pixel_counts_in_neighborhood_5070(x, y, window_size=7))
+    # print(get_pixel_counts_in_buffer_5070(x, y, buffer_meters=115))
     
     # Define sizes to test (in meters)
-    # Testing from 100m to 200km
-    sizes = [100, 1_000, 5_000, 20_000, 50_000, 100_000, 200_000]  # 100m to 200km
+    sizes = [90, 1_500, 3_000, 6_000, 12_000, 24_000]  # 90m to 24km
     
-    # Run benchmarks (5 iterations each)
+    # Run benchmarks (10 iterations each)
     print("\nRunning scaling benchmarks...")
-    results = benchmark_methods_by_size(x, y, sizes, n_iterations=5)
+    results = benchmark_methods_by_size(x, y, sizes, n_iterations=10)
     
     # Print summary statistics
     print("\nPerformance Summary:")
